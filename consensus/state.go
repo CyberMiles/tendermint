@@ -118,6 +118,8 @@ type ConsensusState struct {
 
 	// for reporting metrics
 	metrics *Metrics
+
+	parentBlockTime time.Time
 }
 
 // CSOption sets an optional parameter on the ConsensusState.
@@ -866,6 +868,12 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 		if block == nil { // on error
 			return
 		}
+
+		// Block time should not be earlier than the time of parent block
+		// To avoid the system date is inaccurate of the validator
+		if block.Header.Time.Unix() <= cs.parentBlockTime.Unix() {
+			return
+		}
 	}
 
 	// Make proposal
@@ -1264,6 +1272,9 @@ func (cs *ConsensusState) finalizeCommit(height int64) {
 		// Happens during replay if we already saved the block but didn't commit
 		cs.Logger.Info("Calling finalizeCommit on already stored block", "height", block.Height)
 	}
+
+	// save the block time for later comparing
+	cs.parentBlockTime = block.Header.Time
 
 	fail.Fail() // XXX
 
