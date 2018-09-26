@@ -871,7 +871,7 @@ func (cs *ConsensusState) defaultDecideProposal(height int64, round int) {
 
 		// Block time should not be earlier than the time of parent block
 		// To avoid the system date is inaccurate of the validator
-		if block.Header.Time.Unix() <= cs.parentBlockTime.Unix() {
+		if block.Header.Time.Before(cs.parentBlockTime) {
 			return
 		}
 	}
@@ -990,6 +990,21 @@ func (cs *ConsensusState) defaultDoPrevote(height int64, round int) {
 	// If ProposalBlock is nil, prevote nil.
 	if cs.ProposalBlock == nil {
 		logger.Info("enterPrevote: ProposalBlock is nil")
+		cs.signAddVote(types.VoteTypePrevote, nil, types.PartSetHeader{})
+		return
+	}
+
+	// Block time should not be earlier than the time of parent block
+	// or later when MaxFuturn limit is exceeded
+	// To avoid the system date is inaccurate of the validator
+	blockTime := cs.ProposalBlock.Header.Time
+	if blockTime.Before(cs.parentBlockTime) {
+		logger.Info("enterPrevote: ProposalBlock Time is too early")
+		cs.signAddVote(types.VoteTypePrevote, nil, types.PartSetHeader{})
+		return
+	}
+	if blockTime.After(time.Now().Add(time.Second * 10)) {
+		logger.Info("enterPrevote: ProposalBlock Time exceeds the future")
 		cs.signAddVote(types.VoteTypePrevote, nil, types.PartSetHeader{})
 		return
 	}
